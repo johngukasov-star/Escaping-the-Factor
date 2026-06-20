@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Escaping the Factory</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #050508;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 56.25vw;
+            max-height: 100vh;
+            max-width: 177.78vh;
+            background: #0a0a12;
+            border: 2px solid #00f0ff;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+            overflow: hidden;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 18, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .screen h1 {
+            font-size: 4.5rem;
+            text-transform: uppercase;
+            letter-spacing: 10px;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        #mainMenu h1 { color: #00f0ff; text-shadow: 0 0 20px #00f0ff; }
+        #levelMenu h1 { color: #bd00ff; text-shadow: 0 0 20px #bd00ff; }
+        #restartMenu h1 { color: #ff0055; text-shadow: 0 0 20px #ff0055; }
+        #winMenu h1 { color: #00ff66; text-shadow: 0 0 20px #00ff66; }
+        #pauseMenu h1 { color: #ffaa00; text-shadow: 0 0 20px #ffaa00; }
+        
+        .btn-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .row { display: flex; gap: 20px; }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            font-family: inherit;
+            color: #fff;
+            background: transparent;
+            border: 3px solid;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            transition: all 0.2s ease;
+        }
+        .btn-cyan { border-color: #00f0ff; box-shadow: 0 0 10px rgba(0, 240, 255, 0.2); }
+        .btn-cyan:hover { background: #00f0ff; color: #0a0a12; box-shadow: 0 0 25px #00f0ff; }
+        .btn-magenta { border-color: #ff0055; box-shadow: 0 0 10px rgba(255, 0, 85, 0.2); }
+        .btn-magenta:hover { background: #ff0055; color: #0a0a12; box-shadow: 0 0 25px #ff0055; }
+        .btn-green { border-color: #00ff66; box-shadow: 0 0 10px rgba(0, 255, 102, 0.2); }
+        .btn-green:hover { background: #00ff66; color: #0a0a12; box-shadow: 0 0 25px #00ff66; }
+        .btn-purple { border-color: #bd00ff; box-shadow: 0 0 10px rgba(189, 0, 255, 0.2); }
+        .btn-purple:hover { background: #bd00ff; color: #0a0a12; box-shadow: 0 0 25px #bd00ff; }
+        .btn-orange { border-color: #ffaa00; box-shadow: 0 0 10px rgba(255, 170, 0, 0.2); }
+        .btn-orange:hover { background: #ffaa00; color: #0a0a12; box-shadow: 0 0 25px #ffaa00; }
+        
+        #ui {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            color: #00f0ff;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .bar-container { display: flex; align-items: center; gap: 15px; }
+        .bar-bg {
+            width: 250px;
+            height: 20px;
+            background: #222;
+            border: 2px solid #00f0ff;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+        .hp-bar-fill { width: 100%; height: 100%; background: #00f0ff; box-shadow: 0 0 15px #00f0ff; transition: width 0.1s ease; }
+        .shield-bar-bg { border-color: #bd00ff; box-shadow: 0 0 10px rgba(189, 0, 255, 0.3); }
+        .shield-bar-fill { width: 100%; height: 100%; background: #bd00ff; box-shadow: 0 0 15px #bd00ff; transition: width 0.1s ease; }
+        #keyUi { color: #ffaa00; font-size: 1.4rem; text-shadow: 0 0 10px #ffaa00; display: none; }
+
+        /* Экранная пауза для мобилок */
+        #mobilePauseBtn {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            z-index: 10;
+            width: 60px;
+            height: 60px;
+            background: rgba(10,10,18,0.7);
+            border: 2px solid #ffaa00;
+            color: #ffaa00;
+            font-size: 1.8rem;
+            font-weight: bold;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+        }
+
+        /* Мобильное управление */
+        .mobile-controls {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            padding: 0 40px;
+            display: none; /* Включается через JS на тач-устройствах */
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .dpad, .action-buttons {
+            display: grid;
+            gap: 15px;
+            pointer-events: auto;
+        }
+        .dpad {
+            grid-template-columns: repeat(3, 80px);
+            grid-template-rows: repeat(2, 80px);
+        }
+        .action-buttons {
+            grid-template-columns: repeat(3, 85px);
+        }
+        .m-btn {
+            background: rgba(10, 10, 25, 0.6);
+            border: 3px solid #00f0ff;
+            color: #00f0ff;
+            border-radius: 50%;
+            font-size: 2rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+        .m-btn:active {
+            background: #00f0ff;
+            color: #0a0a12;
+            box-shadow: 0 0 25px #00f0ff;
+        }
+        /* Специфические цвета для кнопок действий */
+        #mBtnShoot { border-color: #ff0055; color: #ff0055; box-shadow: 0 0 15px rgba(255,0,85,0.2); }
+        #mBtnShoot:active { background: #ff0055; color: #0a0a12; box-shadow: 0 0 25px #ff0055; }
+        
+        #mBtnShield { border-color: #bd00ff; color: #bd00ff; box-shadow: 0 0 15px rgba(189,0,255,0.2); display: none;}
+        #mBtnShield:active { background: #bd00ff; color: #0a0a12; box-shadow: 0 0 25px #bd00ff; }
+
+        /* Сетка для стрелок */
+        .grid-left { grid-column: 1; grid-row: 2; }
+        .grid-right { grid-column: 3; grid-row: 2; }
+        .grid-up { grid-column: 2; grid-row: 1; }
+        .grid-down { grid-column: 2; grid-row: 2; }
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <div id="mainMenu" class="screen">
+            <h1>Escaping the Factory</h1>
+            <div class="btn-wrapper">
+                <button class="btn btn-cyan" onclick="openLevelSelect()">PLAY</button>
+            </div>
+        </div>
+
+        <div id="levelMenu" class="screen" style="display: none;">
+            <h1>SELECT LEVEL</h1>
+            <div class="btn-wrapper">
+                <div class="row">
+                    <button class="btn btn-purple" onclick="startGame(1)">Level 1</button>
+                    <button class="btn btn-purple" onclick="startGame(2)">Level 2</button>
+                    <button class="btn btn-purple" onclick="startGame(3)">Level 3</button>
+                </div>
+                <button class="btn btn-cyan" style="font-size: 1.2rem; padding: 10px 25px;" onclick="backToMain()">BACK</button>
+            </div>
+        </div>
+
+        <div id="pauseMenu" class="screen" style="display: none;">
+            <h1>PAUSE</h1>
+            <div class="btn-wrapper">
+                <button class="btn btn-orange" onclick="togglePause()">CONTINUE</button>
+                <button class="btn btn-cyan" onclick="toMainMenu()">MAIN MENU</button>
+            </div>
+        </div>
+
+        <div id="restartMenu" class="screen" style="display: none;">
+            <h1>YOU LOSE</h1>
+            <div class="btn-wrapper">
+                <button class="btn btn-magenta" onclick="restartGame()">PLAY AGAIN</button>
+                <button class="btn btn-cyan" onclick="toMainMenu()">MAIN MENU</button>
+            </div>
+        </div>
+
+        <div id="winMenu" class="screen" style="display: none;">
+            <h1>LEVEL COMPLETE</h1>
+            <div class="btn-wrapper">
+                <button id="nextLevelBtn" class="btn btn-green" onclick="loadNextLevel()">NEXT LEVEL</button>
+                <button class="btn btn-cyan" onclick="toMainMenu()">MAIN MENU</button>
+            </div>
+        </div>
+
+        <div id="mobilePauseBtn" onclick="togglePause()">?</div>
+
+        <div id="ui">
+            <div class="bar-container">
+                <span>HP:</span>
+                <div class="bar-bg">
+                    <div id="hpFill" class="hp-bar-fill"></div>
+                </div>
+            </div>
+            <div class="bar-container" id="shieldUi" style="display: none;">
+                <span>SHD:</span>
+                <div class="bar-bg shield-bar-bg">
+                    <div id="shieldFill" class="shield-bar-fill"></div>
+                </div>
+            </div>
+            <div id="keyUi">?? KEY ACQUIRED</div>
+        </div>
+
+        <div class="mobile-controls" id="mobileControls">
+            <div class="dpad">
+                <button class="m-btn grid-left" id="mBtnLeft"><</button>
+                <button class="m-btn grid-up" id="mBtnUp">^</button>
+                <button class="m-btn grid-right" id="mBtnRight">></button>
+                <button class="m-btn grid-down" id="mBtnDown">v</button>
+            </div>
+            <div class="action-buttons">
+                <button class="m-btn" id="mBtnShield">???</button>
+                <button class="m-btn" id="mBtnShoot">??</button>
+            </div>
+        </div>
+        
+        <canvas id="gameCanvas" width="1920" height="1080"></canvas>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const mainMenu = document.getElementById('mainMenu');
+const levelMenu = document.getElementById('levelMenu');
+const restartMenu = document.getElementById('restartMenu');
+const winMenu = document.getElementById('winMenu');
+const pauseMenu = document.getElementById('pauseMenu');
+const hpFill = document.getElementById('hpFill');
+const shieldFill = document.getElementById('shieldFill');
+const shieldUi = document.getElementById('shieldUi');
+const keyUi = document.getElementById('keyUi');
+const nextLevelBtn = document.getElementById('nextLevelBtn');
+const mobileControls = document.getElementById('mobileControls');
+const mobilePauseBtn = document.getElementById('mobilePauseBtn');
+const mBtnShield = document.getElementById('mBtnShield');
+
+const GRAVITY = 1.1; 
+const BASE_Y = 900;
+let LEVEL_WIDTH = 1920 * 2; 
+let isPlaying = false;
+let isPaused = false;
+let cameraX = 0;
+let currentLevel = 1;
+
+const input = {
+    left: false,
+    right: false,
+    crouch: false,
+    shoot: false
+};
+
+// Проверка мобильного устройства для отображения кнопок
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    mobileControls.style.display = 'flex';
+    mobilePauseBtn.style.display = 'flex';
+}
+
+class Player {
+    constructor() {
+        this.width = 40;
+        this.height = 90;
+        this.x = 150;
+        this.y = BASE_Y - this.height;
+        this.vx = 0;
+        this.vy = 0;
+        this.speed = 9.5;      
+        this.jumpForce = -20;  
+        this.isGrounded = false;
+        this.isCrouching = false;
+        this.hp = 100;
+        this.walkCycle = 0;
+        this.facing = 'right';
+        this.invulnerable = 0;
+        this.shootCooldown = 0;
+
+        this.hasShieldItem = false; 
+        this.shieldActive = false;   
+        this.shieldEnergy = 100;     
+        this.hasKey = false;
+    }
+
+    update() {
+        if (!isPlaying || isPaused) return;
+
+        if (input.crouch && !this.isCrouching) {
+            this.height = 50;
+            this.y += 40;
+            this.isCrouching = true;
+        } else if (!input.crouch && this.isCrouching) {
+            let canStand = true;
+            props.forEach(box => {
+                if (this.x + this.width > box.x && this.x < box.x + box.width) {
+                    if (this.y - 40 < box.y + box.height && this.y > box.y) {
+                        canStand = false;
+                    }
+                }
+            });
+            if (canStand) {
+                this.height = 90;
+                this.y -= 40;
+                this.isCrouching = false;
+            }
+        }
+
+        if (input.left) {
+            this.vx = -this.speed;
+            this.facing = 'left';
+            if (this.isGrounded) this.walkCycle += 0.25;
+        } else if (input.right) {
+            this.vx = this.speed;
+            this.facing = 'right';
+            if (this.isGrounded) this.walkCycle += 0.25;
+        } else {
+            this.vx = 0;
+            this.walkCycle = 0;
+        }
+
+        this.vy += GRAVITY;
+        
+        this.x += this.vx;
+        this.handleBoxCollision('x');
+        this.handleSpecialCollisions('x');
+
+        this.y += this.vy;
+        this.isGrounded = false;
+        this.handleBoxCollision('y');
+        this.handleSpecialCollisions('y');
+
+        platforms.forEach(plat => {
+            if (this.x + this.width > plat.x && this.x < plat.x + plat.width) {
+                if (this.vy >= 0 && this.y + this.height >= plat.y && this.y + this.height - this.vy <= plat.y + 16) {
+                    this.y = plat.y - this.height;
+                    this.vy = 0;
+                    this.isGrounded = true;
+                }
+            }
+        });
+
+        if (this.hasShieldItem) {
+            if (this.shieldActive) {
+                this.shieldEnergy -= 0.3; 
+                if (this.shieldEnergy <= 0) {
+                    this.shieldEnergy = 0;
+                    this.shieldActive = false;
+                }
+            } else {
+                if (this.shieldEnergy < 100) this.shieldEnergy += 0.15; 
+            }
+        }
+
+        if (input.shoot && this.shootCooldown === 0) {
+            let dir = this.facing === 'right' ? 1 : -1;
+            let bX = this.x + (dir === 1 ? this.width + 10 : -15);
+            let bY = this.y + (this.isCrouching ? 20 : 40);
+            playerBullets.push(new Bullet(bX, bY, dir, '#00f0ff'));
+            this.shootCooldown = 15; 
+        }
+
+        if (this.shootCooldown > 0) this.shootCooldown--;
+        if (this.x < 0) this.x = 0;
+        if (this.x + this.width > LEVEL_WIDTH) this.x = LEVEL_WIDTH - this.width;
+
+        if (this.y > canvas.height) {
+            this.hp = 0;
+            triggerGameOver();
+        }
+        if (this.invulnerable > 0) this.invulnerable--;
+
+        if (this.x + this.width > flagX && this.x < flagX + 60 && this.y + this.height > BASE_Y - 120) {
+            if (currentLevel === 3 && !this.hasKey) {
+                // Нужен ключ
+            } else {
+                triggerWinMenu();
+            }
+        }
+    }
+
+    jump() {
+        if (this.isGrounded && !this.isCrouching && isPlaying && !isPaused) {
+            this.vy = this.jumpForce;
+            this.isGrounded = false;
+        }
+    }
+
+    handleBoxCollision(axis) {
+        props.forEach(box => {
+            if (this.x + this.width > box.x && this.x < box.x + box.width &&
+                this.y + this.height > box.y && this.y < box.y + box.height) {
+                if (axis === 'x') {
+                    if (this.vx > 0) this.x = box.x - this.width;
+                    if (this.vx < 0) this.x = box.x + box.width;
+                }
+                if (axis === 'y') {
+                    if (this.vy > 0) {
+                        this.y = box.y - this.height;
+                        this.vy = 0;
+                        this.isGrounded = true;
+                    } else if (this.vy < 0) {
+                        this.y = box.y + box.height;
+                        this.vy = 0;
+                    }
+                }
+            }
+        });
+    }
+
+    handleSpecialCollisions(axis) {
+        if (currentLevel === 3 && level3Mechanics.laserGateActive) {
+            let gate = level3Mechanics.laserGate;
+            if (this.x + this.width > gate.x && this.x < gate.x + gate.width &&
+                this.y + this.height > gate.y && this.y < gate.y + gate.height) {
+                if (axis === 'x') {
+                    if (this.vx > 0) this.x = gate.x - this.width;
+                    if (this.vx < 0) this.x = gate.x + gate.width;
+                }
+                if (axis === 'y') {
+                    if (this.vy > 0) {
+                        this.y = gate.y - this.height;
+                        this.vy = 0;
+                        this.isGrounded = true;
+                    } else if (this.vy < 0) {
+                        this.y = gate.y + gate.height;
+                        this.vy = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    takeDamage() {
+        if (this.invulnerable <= 0 && isPlaying && !isPaused) {
+            this.hp -= 20; 
+            if (this.hp < 0) this.hp = 0;
+            this.invulnerable = 30; 
+            if (this.hp <= 0) triggerGameOver();
+        }
+    }
+
+    respawn() {
+        this.x = 150;
+        this.y = BASE_Y - this.height;
+        this.height = 90;
+        this.vx = 0;
+        this.vy = 0;
+        this.hp = 100;
+        this.isCrouching = false;
+        this.facing = 'right';
+        this.shieldActive = false;
+        this.shieldEnergy = 100;
+        this.hasKey = false;
+    }
+
+    draw() {
+        if (this.invulnerable % 4 > 2) return;
+
+        ctx.save();
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#00f0ff';
+        ctx.strokeStyle = '#00f0ff';
+
+        let cx = this.x + this.width / 2;
+        let topY = this.y;
+
+        if (!this.isCrouching) {
+            ctx.beginPath();
+            ctx.arc(cx, topY + 15, 12, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(cx, topY + 27);
+            ctx.lineTo(cx, topY + 60);
+            ctx.stroke();
+
+            let armDir = this.facing === 'right' ? 1 : -1;
+            ctx.beginPath();
+            ctx.moveTo(cx, topY + 35);
+            ctx.lineTo(cx + 15 * armDir, topY + 45);
+            ctx.lineTo(cx + 25 * armDir, topY + 45);
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(cx + 23 * armDir, topY + 38, 8 * armDir, 5);
+            ctx.fillRect(cx + 23 * armDir, topY + 43, 3 * armDir, 6);
+
+            let swing = Math.sin(this.walkCycle) * 18;
+            ctx.beginPath();
+            ctx.moveTo(cx, topY + 60);
+            ctx.lineTo(cx - 10 + swing, topY + 75);
+            ctx.lineTo(cx - 12 + swing, topY + 90);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(cx, topY + 60);
+            ctx.lineTo(cx + 10 - swing, topY + 75);
+            ctx.lineTo(cx + 12 - swing, topY + 90);
+            ctx.stroke();
+        } else {
+            ctx.beginPath();
+            ctx.arc(cx, topY + 12, 10, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(cx, topY + 22);
+            ctx.lineTo(cx, topY + 40);
+            ctx.stroke();
+
+            let armDir = this.facing === 'right' ? 1 : -1;
+            ctx.beginPath();
+            ctx.moveTo(cx, topY + 28);
+            ctx.lineTo(cx + 22 * armDir, topY + 32);
+            ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(cx + 20 * armDir, topY + 28, 8 * armDir, 4);
+
+            ctx.beginPath();
+            ctx.moveTo(cx, topY + 40);
+            ctx.lineTo(cx - 12, topY + 45);
+            ctx.lineTo(cx - 10, topY + 50);
+            ctx.moveTo(cx, topY + 40);
+            ctx.lineTo(cx + 12, topY + 45);
+            ctx.lineTo(cx + 10, topY + 50);
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        if (this.hasShieldItem && this.shieldActive) {
+            let pulse = Math.sin(Date.now() * 0.01) * 3;
+            ctx.save();
+            ctx.strokeStyle = '#bd00ff';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 20 + pulse;
+            ctx.shadowColor = '#bd00ff';
+            ctx.fillStyle = 'rgba(189, 0, 255, 0.08)';
+            ctx.beginPath();
+            ctx.arc(cx, topY + this.height/2, 75 + pulse, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+}
+
+class Enemy {
+    constructor(x, min, max, yOffset = 0) {
+        this.width = 60;
+        this.height = 90;
+        this.spawnX = x;
+        this.patrolMin = min;
+        this.patrolMax = max;
+        this.yOffset = yOffset;
+        this.isDead = false;
+        this.respawn();
+    }
+
+    respawn() {
+        this.x = this.spawnX;
+        this.y = BASE_Y - this.height - this.yOffset;
+        this.vx = -3;
+        this.hp = 3;
+        this.isDead = false; 
+        this.shootCooldown = 0;
+    }
+
+    update() {
+        if (!isPlaying || isPaused || this.isDead) return;
+
+        this.x += this.vx;
+        if (this.x < this.patrolMin) { this.x = this.patrolMin; this.vx = 3; }
+        if (this.x + this.width > this.patrolMax) { this.x = this.patrolMax - this.width; this.vx = -3; }
+
+        let eCenterY = this.y + this.height / 2;
+        let pCenterY = player.y + player.height / 2;
+
+        if (Math.abs(eCenterY - pCenterY) < 160 && this.shootCooldown <= 0 && Math.abs(player.x - this.x) < 800) {
+            let dir = (player.x < this.x) ? -1 : 1;
+            enemyBullets.push(new Bullet(this.x + (dir === 1 ? this.width : 0), this.y + 35, dir, '#ff0055'));
+            this.shootCooldown = 80;
+        }
+        if (this.shootCooldown > 0) this.shootCooldown--;
+    }
+
+    takeDamage() {
+        if (this.isDead) return;
+        this.hp--;
+        if (this.hp <= 0) this.isDead = true;
+    }
+
+    draw() {
+        if (this.isDead || !isPlaying) return;
+
+        ctx.save();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ff0055';
+        ctx.strokeStyle = '#ff0055';
+        ctx.lineWidth = 3;
+
+        ctx.fillStyle = '#140510';
+        ctx.fillRect(this.x, this.y, this.width, this.height - 20);
+        ctx.strokeRect(this.x, this.y, this.width, this.height - 20);
+
+        ctx.fillStyle = '#333';
+        ctx.fillRect(this.x, this.y - 15, this.width, 6);
+        ctx.fillStyle = '#ff0055';
+        ctx.fillRect(this.x, this.y - 15, this.width * (this.hp / 3), 6);
+
+        ctx.fillStyle = '#fff';
+        let eyeX = this.vx < 0 ? this.x + 10 : this.x + this.width - 20;
+        ctx.fillRect(eyeX, this.y + 15, 10, 10);
+
+        ctx.fillStyle = '#220011';
+        ctx.fillRect(this.x - 4, this.y + this.height - 20, this.width + 8, 20);
+        ctx.strokeRect(this.x - 4, this.y + this.height - 20, this.width + 8, 20);
+        ctx.restore();
+    }
+}
+
+class Bullet {
+    constructor(x, y, dir, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = dir * 16;
+        this.width = 25;
+        this.height = 6;
+        this.color = color;
+    }
+    update(isPlayerBullet) {
+        if (isPaused) return false;
+        this.x += this.vx;
+
+        let hitBox = false;
+        props.forEach(box => {
+            if (this.x < box.x + box.width && this.x + this.width > box.x &&
+                this.y < box.y + box.height && this.y + this.height > box.y) {
+                hitBox = true;
+            }
+        });
+        
+        if (currentLevel === 3 && level3Mechanics.laserGateActive) {
+            let gate = level3Mechanics.laserGate;
+            if (this.x < gate.x + gate.width && this.x + this.width > gate.x &&
+                this.y < gate.y + gate.height && this.y + this.height > gate.y) {
+                hitBox = true;
+            }
+        }
+
+        if (hitBox) return true;
+
+        if (isPlayerBullet) {
+            enemies.forEach(en => {
+                if (!en.isDead && this.x < en.x + en.width && this.x + this.width > en.x &&
+                    this.y < en.y + en.height && this.y + this.height > en.y) {
+                    en.takeDamage();
+                    hitBox = true;
+                }
+            });
+            return hitBox;
+        } else {
+            if (player.hasShieldItem && player.shieldActive) {
+                let pCenterX = player.x + player.width / 2;
+                let pCenterY = player.y + player.height / 2;
+                let dist = Math.hypot(this.x - pCenterX, this.y - pCenterY);
+                if (dist < 85) {
+                    player.shieldEnergy -= 8; 
+                    if (player.shieldEnergy < 0) player.shieldEnergy = 0;
+                    return true;
+                }
+            }
+
+            if (this.x < player.x + player.width && this.x + this.width > player.x &&
+                this.y < player.y + player.height && this.y + this.height > player.y) {
+                player.takeDamage();
+                return true;
+            }
+        }
+        return (this.x < cameraX - 200 || this.x > cameraX + canvas.width + 200);
+    }
+    draw() {
+        ctx.save();
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = this.color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+    }
+}
+
+const player = new Player();
+let platforms = [];
+let props = [];
+let hazards = [];
+let enemies = [];
+let playerBullets = [];
+let enemyBullets = [];
+let flagX = 3750;
+
+let shieldItem = { x: 450, y: BASE_Y - 40, width: 30, height: 40, picked: false };
+
+let level3Mechanics = {
+    button: { x: 850, y: BASE_Y - 335, width: 60, height: 20, pressed: false },
+    laserGate: { x: 1800, y: BASE_Y - 250, width: 25, height: 250 },
+    laserGateActive: true,
+    keyItem: { x: 2050, y: BASE_Y - 50, width: 40, height: 30, picked: false }
+};
+
+function openLevelSelect() {
+    mainMenu.style.display = 'none';
+    levelMenu.style.display = 'flex';
+}
+
+function backToMain() {
+    levelMenu.style.display = 'none';
+    mainMenu.style.display = 'flex';
+}
+
+function setupLevel(lvl) {
+    currentLevel = lvl;
+    playerBullets = [];
+    enemyBullets = [];
+    player.respawn();
+    isPaused = false;
+    pauseMenu.style.display = 'none';
+    keyUi.style.display = 'none';
+    mBtnShield.style.display = 'none';
+
+    if (lvl === 1) {
+        LEVEL_WIDTH = 1920 * 2;
+        flagX = 3750;
+        player.hasShieldItem = false;
+        shieldUi.style.display = 'none';
+
+        platforms = [
+            { x: 0, y: BASE_Y, width: 600, height: 180 },
+            { x: 750, y: BASE_Y - 120, width: 420, height: 35 },
+            { x: 1300, y: BASE_Y, width: 1000, height: 180 }, 
+            { x: 2550, y: BASE_Y, width: 1300, height: 180 }
+        ];
+
+        props = [
+            { x: 500, y: BASE_Y - 50, width: 50, height: 50 }
+        ]; 
+
+        hazards = [
+            { x: 600, y: BASE_Y + 30, width: 700, type: 'acid' },
+            { x: 2300, y: BASE_Y + 30, width: 250, type: 'spikes' } 
+        ];
+
+        enemies = [
+            new Enemy(1650, 1350, 1850),
+            new Enemy(2800, 2600, 3200) 
+        ];
+    } 
+    else if (lvl === 2) {
+        LEVEL_WIDTH = 1920 * 2;
+        flagX = 3600;
+        
+        shieldItem.x = 450;
+        shieldItem.y = BASE_Y - 50;
+        shieldItem.picked = false;
+
+        platforms = [
+            { x: 0, y: BASE_Y, width: 3840, height: 180 }
+        ];
+
+        props = [
+            { x: 1300, y: BASE_Y - 300, width: 1200, height: 240 }
+        ]; 
+
+        hazards = []; 
+
+        enemies = [
+            new Enemy(2700, 2600, 3100)
+        ];
+    }
+    else if (lvl === 3) {
+        LEVEL_WIDTH = 1920 * 2;
+        flagX = 2500; 
+
+        level3Mechanics.button.pressed = false;
+        level3Mechanics.laserGateActive = true;
+        level3Mechanics.keyItem.picked = false;
+
+        platforms = [
+            { x: 0, y: BASE_Y, width: 3840, height: 180 },
+            { x: 450, y: BASE_Y - 140, width: 250, height: 30 },
+            { x: 800, y: BASE_Y - 300, width: 300, height: 30 }
+        ];
+
+        props = [];
+        hazards = [];
+
+        enemies = [
+            new Enemy(1300, 1100, 1600),
+            new Enemy(480, 460, 660, 140) 
+        ];
+    }
+
+    if (player.hasShieldItem) mBtnShield.style.display = 'flex';
+}
+
+function startGame(lvl) {
+    mainMenu.style.display = 'none';
+    levelMenu.style.display = 'none';
+    winMenu.style.display = 'none';
+    restartMenu.style.display = 'none';
+    setupLevel(lvl);
+    clearInputs();
+    isPlaying = true;
+}
+
+function togglePause() {
+    if (!isPlaying) return;
+    isPaused = !isPaused;
+    if (isPaused) {
+        pauseMenu.style.display = 'flex';
+    } else {
+        pauseMenu.style.display = 'none';
+    }
+}
+
+function triggerGameOver() {
+    isPlaying = false;
+    restartMenu.style.display = 'flex';
+}
+
+function restartGame() {
+    restartMenu.style.display = 'none';
+    clearInputs();
+    setupLevel(currentLevel);
+    isPlaying = true;
+}
+
+function triggerWinMenu() {
+    isPlaying = false;
+    winMenu.style.display = 'flex';
+    if (currentLevel === 3) {
+        nextLevelBtn.style.display = 'none';
+    } else {
+        nextLevelBtn.style.display = 'block';
+    }
+}
+
+function loadNextLevel() {
+    startGame(currentLevel + 1);
+}
+
+function toMainMenu() {
+    winMenu.style.display = 'none';
+    restartMenu.style.display = 'none';
+    levelMenu.style.display = 'none';
+    pauseMenu.style.display = 'none';
+    mainMenu.style.display = 'flex';
+    isPlaying = false;
+    isPaused = false;
+}
+
+function clearInputs() {
+    input.left = false;
+    input.right = false;
+    input.crouch = false;
+    input.shoot = false;
+}
+
+/* --- КЛАВИАТУРА И МЫШЬ --- */
+window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { togglePause(); e.preventDefault(); return; }
+    if (isPaused) return;
+
+    const key = e.key.toLowerCase();
+    if (key === 'a' || e.key === 'ArrowLeft') input.left = true;
+    if (key === 'd' || e.key === 'ArrowRight') input.right = true;
+    if (e.key === 'Shift' || e.key === 'ArrowDown') { input.crouch = true; e.preventDefault(); }
+    if (e.key === ' ' || e.key === 'ArrowUp') { player.jump(); e.preventDefault(); }
+    if (key === 'c' || key === 'с') { 
+        if (player.hasShieldItem && player.shieldEnergy > 0) player.shieldActive = !player.shieldActive;
+    }
+});
+
+window.addEventListener('keyup', e => {
+    const key = e.key.toLowerCase();
+    if (key === 'a' || e.key === 'ArrowLeft') input.left = false;
+    if (key === 'd' || e.key === 'ArrowRight') input.right = false;
+    if (e.key === 'Shift' || e.key === 'ArrowDown') input.crouch = false;
+});
+
+window.addEventListener('mousedown', e => { if(isPlaying && !isPaused && e.button === 0) input.shoot = true; });
+window.addEventListener('mouseup', e => { if(e.button === 0) input.shoot = false; });
+
+
+/* --- МОБИЛЬНЫЙ ТАЧ-ИНТЕРФЕЙС (Стрелки) --- */
+const setupMobileBtn = (id, actionStr) => {
+    const btn = document.getElementById(id);
+    
+    btn.addEventListener('touchstart', e => {
+        e.preventDefault();
+        if (!isPlaying || isPaused) return;
+        
+        if (actionStr === 'jump') player.jump();
+        else if (actionStr === 'shield') {
+            if (player.hasShieldItem && player.shieldEnergy > 0) player.shieldActive = !player.shieldActive;
+        } else {
+            input[actionStr] = true;
+        }
+    });
+
+    btn.addEventListener('touchend', e => {
+        e.preventDefault();
+        if (actionStr !== 'jump' && actionStr !== 'shield') {
+            input[actionStr] = false;
+        }
+    });
+};
+
+setupMobileBtn('mBtnLeft', 'left');
+setupMobileBtn('mBtnRight', 'right');
+setupMobileBtn('mBtnUp', 'jump');
+setupMobileBtn('mBtnDown', 'crouch');
+setupMobileBtn('mBtnShoot', 'shoot');
+setupMobileBtn('mBtnShield', 'shield');
+
+
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (isPlaying && !isPaused) {
+        cameraX = player.x - canvas.width / 4;
+        if (cameraX < 0) cameraX = 0;
+        if (cameraX > LEVEL_WIDTH - canvas.width) cameraX = LEVEL_WIDTH - canvas.width;
+    }
+
+    ctx.save();
+    ctx.translate(-cameraX, 0); 
+
+    ctx.strokeStyle = '#121225';
+    ctx.lineWidth = 2;
+    for (let x = 0; x < LEVEL_WIDTH; x += 120) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+
+    player.update();
+    enemies.forEach(en => en.update());
+    playerBullets = playerBullets.filter(b => !b.update(true));
+    enemyBullets = enemyBullets.filter(b => !b.update(false));
+
+    // Уровень 2
+    if (currentLevel === 2 && !shieldItem.picked) {
+        if (!isPaused && player.x + player.width > shieldItem.x && player.x < shieldItem.x + shieldItem.width &&
+            player.y + player.height > shieldItem.y && player.y < shieldItem.y + shieldItem.height) {
+            shieldItem.picked = true;
+            player.hasShieldItem = true;
+            shieldUi.style.display = 'flex';
+            mBtnShield.style.display = 'flex'; // Показываем кнопку щита на мобилке
+        }
+        
+        ctx.save();
+        let floatY = shieldItem.y + Math.sin(Date.now() * 0.006) * 10;
+        ctx.strokeStyle = '#bd00ff'; ctx.lineWidth = 3; ctx.shadowBlur = 15; ctx.shadowColor = '#bd00ff';
+        ctx.fillStyle = 'rgba(189, 0, 255, 0.3)';
+        ctx.fillRect(shieldItem.x, floatY, shieldItem.width, shieldItem.height);
+        ctx.strokeRect(shieldItem.x, floatY, shieldItem.width, shieldItem.height);
+        ctx.restore();
+    }
+
+    // Уровень 3
+    if (currentLevel === 3) {
+        let mech = level3Mechanics;
+
+        if (!mech.button.pressed &&
+            player.x + player.width > mech.button.x && player.x < mech.button.x + mech.button.width &&
+            player.y + player.height >= mech.button.y && player.y <= mech.button.y + mech.button.height) {
+            mech.button.pressed = true;
+            mech.laserGateActive = false; 
+        }
+
+        ctx.save();
+        ctx.fillStyle = mech.button.pressed ? '#00ff66' : '#ff0055';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        let bH = mech.button.pressed ? 6 : 15;
+        ctx.fillRect(mech.button.x, mech.button.y + (mech.button.height - bH), mech.button.width, bH);
+        ctx.strokeRect(mech.button.x, mech.button.y + (mech.button.height - bH), mech.button.width, bH);
+        ctx.restore();
+
+        if (mech.laserGateActive) {
+            ctx.save();
+            ctx.strokeStyle = '#ff0055';
+            ctx.lineWidth = 6;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ff0055';
+            ctx.beginPath();
+            let gateAnim = Math.sin(Date.now() * 0.02) * 5;
+            ctx.moveTo(mech.laserGate.x + gateAnim, mech.laserGate.y);
+            ctx.lineTo(mech.laserGate.x - gateAnim, mech.laserGate.y + mech.laserGate.height);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        if (!mech.laserGateActive && !mech.keyItem.picked) {
+            if (player.x + player.width > mech.keyItem.x && player.x < mech.keyItem.x + mech.keyItem.width &&
+                player.y + player.height > mech.keyItem.y && player.y < mech.keyItem.y + mech.keyItem.height) {
+                mech.keyItem.picked = true;
+                player.hasKey = true;
+                keyUi.style.display = 'block';
+            }
+        }
+
+        if (!mech.keyItem.picked) {
+            ctx.save();
+            let keyFloat = mech.keyItem.y + Math.sin(Date.now() * 0.005) * 6;
+            ctx.strokeStyle = '#ffaa00';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ffaa00';
+            ctx.beginPath();
+            ctx.arc(mech.keyItem.x + 15, keyFloat + 10, 10, 0, Math.PI * 2);
+            ctx.moveTo(mech.keyItem.x + 25, keyFloat + 10);
+            ctx.lineTo(mech.keyItem.x + 45, keyFloat + 10);
+            ctx.lineTo(mech.keyItem.x + 45, keyFloat + 20);
+            ctx.moveTo(mech.keyItem.x + 38, keyFloat + 10);
+            ctx.lineTo(mech.keyItem.x + 38, keyFloat + 17);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    hazards.forEach(hz => {
+        ctx.save();
+        if (hz.type === 'acid') {
+            ctx.fillStyle = 'rgba(0, 255, 100, 0.15)';
+            ctx.fillRect(hz.x, BASE_Y + 30, hz.width, 200);
+            ctx.strokeStyle = '#00ff66';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ff66';
+            ctx.beginPath();
+            let timeFactor = isPaused ? 0 : Date.now() * 0.006;
+            for (let i = hz.x; i <= hz.x + hz.width; i += 25) {
+                ctx.lineTo(i, BASE_Y + 35 + Math.sin(i * 0.04 + timeFactor) * 12);
+            }
+            ctx.stroke();
+        } else if (hz.type === 'spikes') {
+            ctx.fillStyle = '#2a0510';
+            ctx.fillRect(hz.x, BASE_Y + 10, hz.width, 200);
+            ctx.strokeStyle = '#ff0055';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ff0055';
+            ctx.beginPath();
+            for (let i = hz.x; i <= hz.x + hz.width; i += 30) {
+                ctx.lineTo(i, BASE_Y + 80);
+                ctx.lineTo(i + 15, BASE_Y + 15);
+                ctx.lineTo(i + 30, BASE_Y + 80);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    });
+
+    platforms.forEach(plat => {
+        ctx.save();
+        ctx.fillStyle = '#0d0d1a';
+        ctx.strokeStyle = '#bd00ff';
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#bd00ff';
+        ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+        ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
+        ctx.restore();
+    });
+
+    props.forEach(box => {
+        ctx.save();
+        ctx.fillStyle = '#0a1520';
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#00f0ff';
+        ctx.fillRect(box.x, box.y, box.width, box.height);
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+        ctx.beginPath();
+        ctx.moveTo(box.x, box.y); ctx.lineTo(box.x + box.width, box.y + box.height);
+        ctx.moveTo(box.x + box.width, box.y); ctx.lineTo(box.x, box.y + box.height);
+        ctx.stroke();
+        ctx.restore();
+    });
+
+    ctx.save();
+    if (currentLevel === 3 && !player.hasKey) {
+        ctx.strokeStyle = '#aa8800';
+        ctx.shadowColor = '#aa8800';
+        ctx.fillStyle = 'rgba(170, 136, 0, 0.15)';
+    } else {
+        ctx.strokeStyle = '#00ff66';
+        ctx.shadowColor = '#00ff66';
+        ctx.fillStyle = 'rgba(0, 255, 100, 0.3)';
+    }
+    ctx.lineWidth = 5;
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.moveTo(flagX, BASE_Y);
+    ctx.lineTo(flagX, BASE_Y - 120);
+    ctx.lineTo(flagX + 50, BASE_Y - 90);
+    ctx.lineTo(flagX, BASE_Y - 60);
+    ctx.stroke();
+    ctx.fill();
+    ctx.restore();
+
+    if (isPlaying) player.draw();
+    enemies.forEach(en => en.draw());
+    playerBullets.forEach(b => b.draw());
+    enemyBullets.forEach(b => b.draw());
+
+    ctx.restore(); 
+
+    if (!isPaused) {
+        hpFill.style.width = player.hp + '%';
+        if(player.hasShieldItem) {
+            shieldFill.style.width = player.shieldEnergy + '%';
+        }
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
